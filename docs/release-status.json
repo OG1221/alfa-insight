@@ -1,0 +1,27 @@
+{
+  "checked_at": "2026-10-22",
+  "deadline": "2026-10-26",
+  "deadline_time_known": false,
+  "backend_tests": {
+    "tests": 42,
+    "failures": 0,
+    "errors": 0
+  },
+  "e2e": {
+    "startTime": "2026-10-22T17:39:52.648Z",
+    "duration": 92996.317,
+    "expected": 8,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "frontend_build": "passed",
+  "migrations_fresh_schema": "passed",
+  "local_start_script": "passed",
+  "final_http_smoke": "passed",
+  "real_llm": "blocked: organizer API configuration absent",
+  "docker_runtime": "not tested: Docker absent",
+  "public_url": null,
+  "github_remote": null,
+  "release_tag": "v0.1.0-demo"
+}

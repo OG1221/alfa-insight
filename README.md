@@ -151,6 +151,8 @@ corepack pnpm exec playwright install chromium
 corepack pnpm test:e2e
 ```
 
+Итоговая локальная проверка: 42 backend-теста и 8 E2E desktop/mobile прошли; TypeScript/Vite, миграции с нуля и HTTP smoke проходят. Подробности — `docs/verification.md`.
+
 На этой машине вместо скачивания браузера использован установленный Chrome:
 
 ```sh

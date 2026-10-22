@@ -12,10 +12,13 @@ CATEGORIES={
  'Отрасли и рынки':('металл','сталь','золот','нефт','сырь','промышлен','производств','потреблен'),
  'Регулирование':('налог','закон','регулирован','ндс','отчетност'),
  'Логистика':('логист','перевоз','транспорт','порт','поставк')}
-STOP={'компани','деятельност','производств','проч','оптов','торговл','издел','товар','различ','основн','прочие','услуг','друг'}
+STOP={s[:7] for s in ['компани','деятельност','производств','проч','оптов','торговл','издел','товар','различ','основн','прочие','услуг','друг','включен','группиров','осуществл','предоставл','операци','указан','сведен','профиля','датасет']}
 def tokens(text):return {s[:7] for s in re.findall(r'[а-яёa-z]{4,}',text.lower()) if s[:7] not in STOP}
 def is_rate_event(text):
-    return bool(re.search(r'\b(?:ставк\w*|кредит\w*|денежно-кредит\w*)',text.lower()))
+    return bool(re.search(r'\b(?:ставк\w*|денежно-кредит\w*)',text.lower()))
+
+def is_credit_event(text):
+    return bool(re.search(r'\b(?:кредитован\w*|кредит(?:ы|ов|ам|ах|а|у|ом)?|финансирован\w*)\b|\bкредитн\w*\s+(?:договор\w*|продукт\w*)',text.lower()))
 
 def classify(text):
     text=text.lower();scores={k:sum(len(re.findall(r'\b'+re.escape(t)+r'\w*',text)) for t in terms) for k,terms in CATEGORIES.items()}
@@ -29,7 +32,7 @@ def rank(company,article,role='cfo',related=None,bank_available=False):
     if shared:add('sector',min(RANK_CONFIG['sector']['cap'],RANK_CONFIG['sector']['base']+RANK_CONFIG['sector']['per_match']*len(shared)),'Совпадение отраслевых признаков: '+', '.join(sorted(shared)))
     if company.region and any(t in text for t in tokens(company.region)):add('region',14,'Событие упоминает регион регистрации')
     rate=is_rate_event(text)
-    if rate and company.products.get('Кредиты'):add('loans',25,'Есть кредитный продукт: проверить чувствительность условий финансирования')
+    if (rate or is_credit_event(text)) and company.products.get('Кредиты'):add('loans',25,'Есть кредитный продукт: проверить применимость события к условиям финансирования')
     if rate and company.products.get('Депозиты'):add('deposits',18,'Есть депозитный продукт: проверить условия новых размещений')
     if rate and company.products.get('Лизинг'):add('leasing',10,'Есть лизинг: проверить стоимость новых договоров')
     if company.products.get('Факторинг') and any(t in text for t in ['ставк','платеж','оборотн','поставк']):add('factoring',9,'Есть факторинг: релевантны условия оборотного финансирования')

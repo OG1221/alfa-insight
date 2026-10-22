@@ -164,7 +164,54 @@ def test_migrations_on_empty_postgres_schema():
         result=subprocess.run([sys.executable,'-m','alembic','-c',str(ROOT/'backend/alembic.ini'),'upgrade','head'],env=env,capture_output=True,text=True,timeout=30)
         assert result.returncode==0,result.stderr
         with engine.connect() as c:
-            assert c.execute(text(f'SELECT version_num FROM {schema}.alembic_version')).scalar()=='0003'
+            assert c.execute(text(f'SELECT version_num FROM {schema}.alembic_version')).scalar()=='0004'
             assert c.execute(text("SELECT count(*) FROM pg_indexes WHERE schemaname=:s AND indexname='ix_chunk_fts_ru'"),{'s':schema}).scalar()==1
     finally:
         with engine.begin() as c:c.execute(text(f'DROP SCHEMA {schema} CASCADE'))
+
+
+def test_institutional_credit_word_does_not_imply_rate_sensitivity(fixture_data):
+    from app.ranking import is_credit_event,tokens
+    assert not is_rate_event('Отозвана лицензия у кредитной организации')
+    assert not is_credit_event('Отозвана лицензия у кредитной организации')
+    assert is_credit_event('Льготное кредитование инфраструктурных проектов')
+    assert not tokens('Строительство прочих сооружений, не включенных в другие группировки') & tokens('В список включены ценные бумаги')
+
+
+def test_metrics_script_refuses_unlabeled_and_matches_known_example(tmp_path):
+    import subprocess,sys,math
+    labels=tmp_path/'labels.csv';pred=tmp_path/'pred.csv'
+    labels.write_text('query_id,company_id,article_id,relevance\nq,C,A,3\nq,C,B,0\n')
+    pred.write_text('query_id,article_id,score\nq,A,1\nq,B,2\n')
+    result=subprocess.run([sys.executable,str(ROOT/'scripts/evaluate_ranking.py'),str(labels),str(pred),'-k','2'],capture_output=True,text=True)
+    assert result.returncode==0
+    item=json.loads(result.stdout)['results'][0]
+    assert item['precision_at_k']==.5 and item['ndcg_at_k']==pytest.approx(1/math.log2(3))
+    labels.write_text('query_id,company_id,article_id,relevance\n')
+    result=subprocess.run([sys.executable,str(ROOT/'scripts/evaluate_ranking.py'),str(labels),str(pred)],capture_output=True,text=True)
+    assert result.returncode!=0 and 'No human labels' in result.stderr
+
+
+def test_private_news_cannot_leak_through_synthetic_company(fixture_data):
+    from app.main import app,get_db,limits
+    db=fixture_data;a,_=add_article(db,'Закрытый материал организатора','Архивный текст для теста разграничения доступа. Материал не должен быть виден демонстрационному пользователю.',private=True)
+    run=asyncio.run(analyze(db,'DEMO_U_101',a.id))
+    app.dependency_overrides[get_db]=lambda:db;limits.clear();client=TestClient(app)
+    try:
+        assert client.get('/api/articles/'+a.id).status_code==403
+        assert client.get('/api/analyses/'+run.id).status_code==403
+        assert client.get('/api/analyses/'+run.id+'/sources').status_code==403
+        assert client.post('/api/analyses',json={'company_id':'DEMO_U_101','article_id':a.id}).status_code==403
+        feed=client.get('/api/feed',params={'company_id':'DEMO_U_101'}).json()['items']
+        assert a.id not in [x['id'] for x in feed]
+        assert client.get('/api/articles/'+a.id,headers={'Authorization':'Bearer alfa-local-admin'}).status_code==200
+    finally:app.dependency_overrides.clear()
+
+
+def test_bank_search_prioritizes_linked_original(db):
+    for ident,url,repetitions in [('original','https://example.org/original.pdf',1),('other','https://example.org/other.pdf',8)]:
+        db.add(BankDocument(id=ident,title=ident,sha256=ident*8,pages=1,source_url=url));db.flush()
+        db.add(Chunk(id=ident+':1:0',document_id=ident,page=1,text=('Ключевая ставка сохранена. '*repetitions)))
+    db.commit()
+    result=search_bank(db,'ключевая ставка',preferred_url='https://example.org/original.pdf')
+    assert result[0]['document_id']=='original'

@@ -55,7 +55,9 @@ def get_company(db,id,p):
 def get_run(db,id,p):
     r=db.get(AgentRun,id)
     if not r:raise HTTPException(404,'Анализ не найден')
-    get_company(db,r.company_id,p);return r
+    get_company(db,r.company_id,p)
+    if db.get(Article,r.article_id).private and not p.admin:raise HTTPException(403,'Источник доступен локальному администратору')
+    return r
 
 @app.get('/api/health')
 def health(db:DB):
@@ -78,6 +80,7 @@ def company(company_id:str,db:DB,p:P):return profile(db,get_company(db,company_i
 @app.get('/api/feed')
 def feed(company_id:str,db:DB,p:P,role:Role='cfo',category:str='',q:str=Query('',max_length=150),sort:str='relevance',limit:int=Query(60,ge=1,le=100)):
     c=get_company(db,company_id,p);stmt=select(Article)
+    if not p.admin:stmt=stmt.where(Article.private.is_(False))
     if category:stmt=stmt.where(Article.category==category)
     if q:stmt=stmt.where(or_(Article.title.ilike('%'+q+'%'),Article.text.ilike('%'+q+'%')))
     rows=db.scalars(stmt.order_by(Article.published_at.desc()).limit(500)).all();related=relations(db,c)
@@ -88,21 +91,26 @@ def feed(company_id:str,db:DB,p:P,role:Role='cfo',category:str='',q:str=Query(''
 def article(id:str,db:DB,p:P):
     a=db.get(Article,id)
     if not a:raise HTTPException(404,'Событие не найдено')
+    if a.private and not p.admin:raise HTTPException(403,'Источник доступен локальному администратору')
     return article_dict(a)
 @app.post('/api/articles')
 async def create_news(body:NewsInput,db:DB,p:P):
     try:
         title,content,source=body.title,body.text,'Ручной ввод — источник не верифицирован'
         if body.url:title,content,source=await parse_url(str(body.url))
-        a,created=add_article(db,title,content,str(body.url) if body.url else None,source,body.published_at)
+        a,created=add_article(db,title,content,str(body.url) if body.url else None,source,body.published_at,private=p.admin)
+        if a.private and not p.admin:raise HTTPException(403,'Источник доступен локальному администратору')
         return {'article':article_dict(a),'created':created}
+    except HTTPException:raise
     except Exception as exc:raise HTTPException(422,str(exc)[:250]) from None
 @app.post('/api/news/refresh')
 async def refresh(db:DB,p:P):return {'sources':await refresh_news(db)}
 @app.post('/api/analyses')
 async def create_analysis(body:AnalysisInput,db:DB,p:P):
     get_company(db,body.company_id,p)
-    if not db.get(Article,body.article_id):raise HTTPException(404,'Новость не найдена')
+    event=db.get(Article,body.article_id)
+    if not event:raise HTTPException(404,'Новость не найдена')
+    if event.private and not p.admin:raise HTTPException(403,'Источник доступен локальному администратору')
     try:
         run=await asyncio.wait_for(analyze(db,body.company_id,body.article_id,body.role),timeout=settings.agent_timeout+5)
         return run_dict(db,run)

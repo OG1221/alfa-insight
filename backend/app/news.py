@@ -13,20 +13,24 @@ from .security import fetch_public
 FEEDS=[{'name':'Банк России — пресс-релизы','url':'https://www.cbr.ru/rss/RssPress'}, {'name':'Интерфакс — бизнес','url':'https://www.interfax.ru/rss'}]
 def canonical(url):
     p=urlsplit(url);return urlunsplit((p.scheme,p.netloc.lower(),p.path.rstrip('/'),p.query,''))
-def add_article(db,title,text,url=None,source='Ручной ввод — не проверено',published_at=None,synthetic=False):
+def add_article(db,title,text,url=None,source='Ручной ввод — не проверено',published_at=None,synthetic=False,private=False):
     title=' '.join(title.split())[:500];text=' '.join(text.split())[:60000]
     if len(title)<5 or len(text)<30:raise ValueError('Недостаточно текста для обработки новости')
     fingerprint=hashlib.sha256(re.sub(r'\W+','',title.lower()).encode()).hexdigest()
     url=canonical(url) if url else None
     old=db.scalar(select(Article).where(or_(Article.fingerprint==fingerprint,Article.url==url) if url else Article.fingerprint==fingerprint))
-    if old:return old,False
+    if old:
+        if private and not old.private:old.private=True;db.commit()
+        return old,False
     facts=[s.strip() for s in re.split(r'(?<=[.!?])\s+',text) if len(s.strip())>20][:5]
-    article=Article(id=fingerprint[:24],fingerprint=fingerprint,title=title,text=text,url=url,source=source,published_at=published_at or datetime.now(timezone.utc),category=classify(title+' '+text),facts=facts,synthetic=synthetic)
+    article=Article(id=fingerprint[:24],fingerprint=fingerprint,title=title,text=text,url=url,source=source,published_at=published_at or datetime.now(timezone.utc),category=classify(title+' '+text),facts=facts,synthetic=synthetic,private=private)
     db.add(article)
     try:db.commit()
     except IntegrityError:
         db.rollback();old=db.scalar(select(Article).where(Article.fingerprint==fingerprint));
-        if old:return old,False
+        if old:
+            if private and not old.private:old.private=True;db.commit()
+            return old,False
         raise
     return article,True
 

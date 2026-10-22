@@ -63,8 +63,8 @@ async def analyze(db,company_id,article_id,role='cfo',provider=None):
         plan+=['check_claims','save_result'];run.plan=plan;db.commit()
         tool('get_bank_products',lambda:company.products)
         related=tool('analyze_relationships',lambda:p['relationships']) if p['relationships']['items'] else {'items':[]}
-        nearby=tool('search_related_news',lambda:[{'id':a.id,'title':a.title} for a in db.scalars(select(Article).where(Article.category==article.category,Article.id!=article.id).limit(4))])
-        bank=tool('search_bank_analytics',lambda:search_bank(db,article.title,4,company.synthetic))
+        nearby=tool('search_related_news',lambda:[{'id':a.id,'title':a.title} for a in db.scalars(select(Article).where(Article.category==article.category,Article.id!=article.id,Article.private.is_(False) if company.synthetic else True).limit(4))])
+        bank=tool('search_bank_analytics',lambda:search_bank(db,article.title,4,company.synthetic,article.url))
         if not bank:
             run.plan=run.plan[:-2]+['broaden_search']+run.plan[-2:];db.commit()
             bank=tool('broaden_search',lambda:search_bank(db,article.category+' '+company.sector,4,company.synthetic))

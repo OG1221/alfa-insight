@@ -51,6 +51,7 @@ class Article(Base):
     category: Mapped[str] = mapped_column(String(50), index=True)
     facts: Mapped[list] = mapped_column(JSON, default=list)
     synthetic: Mapped[bool] = mapped_column(Boolean, default=False)
+    private: Mapped[bool] = mapped_column(Boolean, default=False, server_default='false')
     __table_args__ = (Index('ix_article_date', 'published_at'),)
 
 class BankDocument(Base):

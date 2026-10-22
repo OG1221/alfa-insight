@@ -10,7 +10,7 @@ from sqlalchemy import select
 with SessionLocal() as db:
  doc=db.scalar(select(BankDocument).where(BankDocument.title.ilike('%Policy Rate%')))
  chunk=db.scalar(select(Chunk).where(Chunk.document_id==doc.id,Chunk.page==1).order_by(Chunk.id))
- a,_=add_article(db,'Архив · 11 сентября 2026: ключевая ставка без изменения',chunk.text,doc.source_url,'Архив кейса — обзор Альфа-Банка (OCR)',datetime(2026,9,11,12,tzinfo=timezone.utc))
+ a,_=add_article(db,'Архив · 11 сентября 2026: ключевая ставка без изменения',chunk.text,doc.source_url,'Архив кейса — обзор Альфа-Банка (OCR)',datetime(2026,9,11,12,tzinfo=timezone.utc),private=True)
  outcomes=[]
  for cid in ['U_9250','U_57706']:
   run=asyncio.run(analyze(db,cid,a.id))
