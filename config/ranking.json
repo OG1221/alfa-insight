@@ -1,0 +1,19 @@
+{
+  "description": "Heuristic relevance points, not probabilities. Weights are not expert-calibrated.",
+  "weights": {
+    "base": 8,
+    "region": 14,
+    "loans": 25,
+    "deposits": 18,
+    "leasing": 10,
+    "factoring": 9,
+    "foreign_trade": 26,
+    "countries": 10,
+    "group": 5,
+    "counterparty": 8,
+    "scale_known": 2,
+    "bank": 5
+  },
+  "sector": {"base": 14, "per_match": 7, "cap": 28},
+  "role": {"financial": 8, "accountant": 12, "ceo": 8}
+}

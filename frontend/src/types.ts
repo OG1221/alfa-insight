@@ -1,0 +1,13 @@
+export type Role='ceo'|'cfo'|'treasury'|'accountant';
+export type Company={id:string;label:string;sector:string;okved:string;region:string;city:string;revenue:number|null;revenue_unit:string;products:Record<string,boolean>;foreign_trade:boolean;countries:string;group_id:string|null;synthetic:boolean;raw?:Record<string,string>;limitations?:string[];relationships?:{items:Relation[];payment_edges:number;truncated:boolean;note:string}};
+export type Relation={id:string;kinds:string[];amount:number;count:number;sector:string;region:string};
+export type Relevance={score:number;explanation:string;label:string;reasons:{feature:string;points:number;label:string}[]};
+export type Article={id:string;title:string;text:string;url:string|null;source:string;published_at:string;fetched_at:string;category:string;facts:string[];synthetic:boolean;relevance:Relevance};
+export type Claim={text:string;evidence_ids:string[]};
+export type Evidence={id:string;type:string;title:string;text:string;url?:string;page?:number;synthetic:boolean;extraction?:string};
+export type Excerpt={id:string;document_id:string;title:string;text:string;page:number;source_url:string|null;synthetic:boolean;extraction:string;rank:number};
+export type Interpretation={summary:Claim;risks:Claim[];opportunities:Claim[];actions:Claim[];uncertainties:string[]};
+export type Run={id:string;status:string;company_id:string;article_id:string;role:Role;mode:string;task:string;plan:string[];started_at:string;duration_ms:number;steps:{tool:string;summary:string;output:Record<string,unknown>;duration_ms:number;created_at:string}[];result:{company:Company;event:Article;relevance:Relevance;interpretation:Interpretation;bank_excerpts:Excerpt[];evidence:Evidence[];uncertainties:string[];validation:Record<string,unknown>;mode:string;ai_available:boolean;generation_error:string|null}};
+export type Status={ai_available:boolean;ai_message:string;llm_mode:string;data_access:string};
+export type Document={id:string;title:string;pages:number;source_url:string|null;synthetic:boolean;extraction:string;imported_at:string};
+export type Metrics={runs:number;completed:number;failed:number;avg_duration_ms:number|null;claims_with_checked_references:number;reference_coverage:number|null;semantic_quality_measured:boolean;llm_cost_or_reserved_rub:number|null;feedback_count:number;precision_at_k:null;ndcg:null};

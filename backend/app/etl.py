@@ -4,7 +4,7 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from .pdf_extract import extract_pages
-from .db import Company, PersonLink, Payment, BankDocument, Chunk, ImportBatch
+from .db import Company, PersonLink, Payment, BankDocument, Chunk, ImportBatch, DataIssue
 
 PRODUCTS={'CL_PRODUCT_RKO_MARK':'РКО','CL_PRODUCT_GAR_MARK':'Гарантии','CL_PRODUCT_LOA_MARK':'Кредиты','CL_PRODUCT_LEA_MARK':'Лизинг','CL_PRODUCT_DEP_MARK':'Депозиты','CL_PRODUCT_ZPP_MARK':'Зарплатный проект','FACTORING_MARK':'Факторинг'}
 def hash_id(value): return hashlib.sha256(value.encode()).hexdigest()
@@ -33,15 +33,15 @@ def upsert(db,model,rows):
 def import_csv(db,path,synthetic=False):
     reader,encoding,delimiter,digest=read_csv(path)
     old=db.get(ImportBatch,digest)
-    if old:return {**old.report,'already_imported':True}
     fields=set(reader.fieldnames or [])
     if 'REVENUE_COMPANY' in fields: kind='companies';required={'SYNTHETIC_U','MAINOKVED_NAME','REVENUE_COMPANY'};model=Company
     elif 'PAY_AMT' in fields:kind='payments';required={'PAYER','BENEFICIARY','PAY_AMT','PAY_CNT'};model=Payment
     else:kind='person_links';required={'SYNTHETIC_F','SYNTHETIC_U'};model=PersonLink
+    if old and old.report.get('pipeline_version')==3:return {**old.report,'already_imported':True}
     if not required <= fields:raise ValueError(f'Нет обязательных колонок: {required-fields}')
-    report={'kind':kind,'rows':0,'accepted':0,'rejected':0,'duplicates':0,'missing_values':0,'unknown_company_links':0,'invalid_flags':0,'encoding':encoding,'delimiter':delimiter,'synthetic':synthetic,'sha256':digest}
+    report={'pipeline_version':3,'conflicting_rows':0,'kind':kind,'rows':0,'accepted':0,'rejected':0,'duplicates':0,'missing_values':0,'unknown_company_links':0,'invalid_flags':0,'encoding':encoding,'delimiter':delimiter,'synthetic':synthetic,'sha256':digest}
     known=set(db.scalars(select(Company.id))) if kind!='companies' else set()
-    seen=set();batch=[]
+    seen={};batch=[]
     for row in reader:
         report['rows']+=1
         r={k:cleaned(v) for k,v in row.items() if k};report['missing_values']+=sum(v=='' for v in r.values())
@@ -62,14 +62,26 @@ def import_csv(db,path,synthetic=False):
         else:
             co=r.get('SYNTHETIC_U','');person=r.get('SYNTHETIC_F','')
             if synthetic:co='DEMO_'+co if not co.startswith('DEMO_') else co;person='DEMO_'+person
-            if not co or not person or co not in known:report['rejected']+=1;continue
+            if not co or not person:report['rejected']+=1;continue
+            report['unknown_company_links']+=int(co not in known)
             ident=hash_id(person+'|'+co)
             value={'id':ident,'company_id':co,'person_id':person,'city':r.get('CITY_NAME',''),'region':r.get('RC_NAME','')}
-        if ident in seen:report['duplicates']+=1;continue
-        seen.add(ident);batch.append(value);report['accepted']+=1
+        row_digest=hash_id(json.dumps(r,ensure_ascii=False,sort_keys=True))
+        if ident in seen:
+            if seen[ident]==row_digest:report['duplicates']+=1;continue
+            report['conflicting_rows']+=1
+            issue_id=hash_id(digest+ident+row_digest)
+            if not db.get(DataIssue,issue_id):
+                db.add(DataIssue(id=issue_id,batch_sha=digest,kind=kind,record_key=r.get('SYNTHETIC_U') or (r.get('PAYER','')+'|'+r.get('BENEFICIARY','')),detail={'incoming_variant':r,'first_row_sha':seen[ident],'policy':'company: first occurrence retained with conflict flag; payment: distinct conflicting row retained separately'}))
+            if kind!='payments':continue
+            ident=hash_id(ident+'|'+row_digest);value['id']=ident
+            if ident in seen:report['duplicates']+=1;continue
+        seen[ident]=row_digest;batch.append(value);report['accepted']+=1
         if len(batch)>=700:upsert(db,model,batch);batch=[]
     upsert(db,model,batch)
-    db.add(ImportBatch(sha256=digest,name=Path(path).name,report=report));db.commit()
+    if old:old.report=report
+    else:db.add(ImportBatch(sha256=digest,name=Path(path).name,report=report))
+    db.commit()
     return report
 
 def import_pdf(db,path,source_url=None,synthetic=False):

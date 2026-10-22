@@ -2,7 +2,7 @@ import time,uuid,re
 from sqlalchemy import select
 from .db import Company,Article,AgentRun,AgentStep
 from .profiles import profile,relations
-from .ranking import rank
+from .ranking import rank,is_rate_event
 from .search import search_bank
 from .news import article_dict
 from .llm import get_provider,readiness
@@ -13,7 +13,7 @@ TOOL_LABELS={'get_company_profile':'Загружен профиль компан
 def rule_interpretation(company,article,relevance):
     text=(article.title+' '+article.text).lower();risks=[];opportunities=[];actions=[]
     def claim(text,ids=None):return {'text':text,'evidence_ids':ids or ['profile','news']}
-    if any(t in text for t in ['ставк','кредит','денежно-кредит']):
+    if is_rate_event(text):
         if company.products.get('Кредиты'):
             risks.append(claim('Есть кредитный продукт. Чувствительность расходов к ставке возможна для плавающих договоров и нового финансирования; тип ставки и задолженность неизвестны.'))
             actions.append(claim('Проверить структуру ставок, даты пересмотра и погашения в кредитных договорах. Сумму эффекта оценивать после получения этих данных.'))

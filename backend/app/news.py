@@ -10,7 +10,7 @@ from .db import Article
 from .ranking import classify
 from .security import fetch_public
 
-FEEDS=[{'name':'Банк России — пресс-релизы','url':'https://www.cbr.ru/rss/RssPress'}, {'name':'Интерфакс — бизнес','url':'https://www.interfax.ru/rss.asp'}]
+FEEDS=[{'name':'Банк России — пресс-релизы','url':'https://www.cbr.ru/rss/RssPress'}, {'name':'Интерфакс — бизнес','url':'https://www.interfax.ru/rss'}]
 def canonical(url):
     p=urlsplit(url);return urlunsplit((p.scheme,p.netloc.lower(),p.path.rstrip('/'),p.query,''))
 def add_article(db,title,text,url=None,source='Ручной ввод — не проверено',published_at=None,synthetic=False):

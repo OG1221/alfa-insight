@@ -26,7 +26,7 @@ class PersonLink(Base):
     __tablename__ = 'person_links'
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     person_id: Mapped[str] = mapped_column(String(100), index=True)
-    company_id: Mapped[str] = mapped_column(ForeignKey('companies.id'), index=True)
+    company_id: Mapped[str] = mapped_column(String(100), index=True)
     city: Mapped[str] = mapped_column(Text, default='')
     region: Mapped[str] = mapped_column(Text, default='')
 
@@ -113,6 +113,14 @@ class LLMUsage(Base):
     output_tokens: Mapped[int] = mapped_column(Integer, default=0)
     cost_rub: Mapped[float] = mapped_column(Float, default=0)
     status: Mapped[str] = mapped_column(String(30), default='reserved')
+
+class DataIssue(Base):
+    __tablename__ = 'data_issues'
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    batch_sha: Mapped[str] = mapped_column(String(64), index=True)
+    kind: Mapped[str] = mapped_column(String(30))
+    record_key: Mapped[str] = mapped_column(String(150), index=True)
+    detail: Mapped[dict] = mapped_column(JSON)
 
 class ImportBatch(Base):
     __tablename__ = 'import_batches'

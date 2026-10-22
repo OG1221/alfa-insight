@@ -1,0 +1,42 @@
+Alfa Insight — contest prototype, 2026
+
+This project is not an official Alfa-Bank product and provides no banking authentication.
+No paid third-party service has been activated.
+
+Core components (upstream licenses remain authoritative):
+- Python 3.12 — Python Software Foundation License; https://www.python.org/
+- FastAPI — MIT; https://github.com/fastapi/fastapi
+- Starlette — BSD-3-Clause; https://github.com/encode/starlette
+- Pydantic / pydantic-settings — MIT; https://github.com/pydantic/pydantic
+- SQLAlchemy / Alembic — MIT; https://www.sqlalchemy.org/
+- psycopg / psycopg-binary — LGPL-3.0; https://www.psycopg.org/
+- PostgreSQL — PostgreSQL License; https://www.postgresql.org/
+- Uvicorn / HTTPX — BSD-3-Clause; https://www.encode.io/
+- Beautiful Soup — MIT; https://www.crummy.com/software/BeautifulSoup/
+- feedparser — BSD-2-Clause; https://github.com/kurtmckee/feedparser
+- pypdf — BSD-3-Clause; https://github.com/py-pdf/pypdf
+- pypdfium2 — Apache-2.0 or BSD-3-Clause; PDFium and its dependencies retain their respective licenses; https://github.com/pypdfium2-team/pypdfium2
+- Pillow — HPND; https://python-pillow.org/
+- pytest — MIT; https://pytest.org/
+- React / React DOM / Vite / pnpm / Lucide — MIT; see respective upstream packages
+- TypeScript — Apache-2.0; https://www.typescriptlang.org/
+- Playwright — Apache-2.0; https://playwright.dev/
+- Golos Text — SIL Open Font License 1.1; https://fonts.google.com/specimen/Golos+Text
+- Tesseract (Docker/Linux OCR) — Apache-2.0; https://github.com/tesseract-ocr/tesseract
+- macOS Vision / Swift frameworks — Apple platform terms; local OCR only, no cloud API
+- Node / Python / PostgreSQL container images — respective upstream and bundled OS component licenses
+
+Full transitive versions: backend/requirements.lock.txt, frontend/pnpm-lock.yaml.
+Package license files accompany installed distributions. Preserve them when redistributing bundles.
+
+Datasets and documents:
+- Official anonymized contest CSV and Alfa-Bank research PDFs from the two folders linked in the case. No open redistribution license was supplied. These are excluded from Git and Docker build context and remain in data/private locally. Public accessibility is not treated as a grant of redistribution rights.
+- Synthetic CSV and teaching news scenarios are authored for this prototype and explicitly marked. They do not describe real organizations or bank positions.
+- Bank of Russia and Interfax RSS: attributed titles/announcements and original links; publisher rights and source availability remain with publishers. No paywall/authentication bypass.
+- Official case PDF is supplied by the participant and is not modified or copied into the repository.
+
+LLM integrations:
+- No actual model weights are bundled, no organizer API key is available, and no real LLM request has been made by the application.
+- Only the six case-approved model names are permitted. Licensing and API usage terms must be confirmed with organizers before enabling an actual model.
+- TestProvider is a deterministic test stub, not generative AI and not bank expertise. HTTP contract tests use a local stub and fictional organizer.invalid endpoint, never a real provider.
+- The developer's coding assistant is a development tool, not the running application's AI engine.
