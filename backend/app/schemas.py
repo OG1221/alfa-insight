@@ -22,12 +22,18 @@ class QuestionInput(BaseModel):
 class FeedbackInput(BaseModel):
     rating: Literal[-1,1]
     comment: str = Field(default='',max_length=2000)
+class EvidenceQuote(BaseModel):
+    evidence_id: str = Field(min_length=1,max_length=150)
+    quote: str = Field(min_length=8,max_length=700)
+
 class Claim(BaseModel):
     text: str = Field(min_length=1,max_length=1800)
     evidence_ids: list[str] = Field(min_length=1,max_length=8)
+    evidence_quotes: list[EvidenceQuote] = Field(default_factory=list,max_length=8)
 class GeneratedInsight(BaseModel):
     summary: Claim
     risks: list[Claim] = Field(max_length=6)
     opportunities: list[Claim] = Field(max_length=6)
     actions: list[Claim] = Field(max_length=6)
+    bank_view: list[Claim] = Field(default_factory=list,max_length=4)
     uncertainties: list[str] = Field(max_length=12)

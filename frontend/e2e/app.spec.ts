@@ -28,6 +28,7 @@ test('SSRF rejection has a readable error',async({page})=>{
  await page.goto('/');await page.getByRole('button',{name:'Новое событие',exact:true}).click();await page.getByRole('button',{name:'По ссылке',exact:true}).click();await page.getByLabel('Ссылка на публикацию',{exact:true}).fill('http://127.0.0.1:5432');await page.getByRole('button',{name:'Разобрать для компании'}).click();await expect(page.getByRole('alert')).toContainText('Разрешены только HTTPS');
 });
 test('official company access and bank search are gated and work locally',async({page})=>{
+ test.skip(process.env.SKIP_OFFICIAL_E2E==='1','Official organizer data is intentionally not included in CI or public demos');
  await page.goto('/');await nav(page,'Настройки стенда');await page.getByLabel('Токен локального стенда').fill('alfa-local-admin');await page.getByRole('button',{name:'Открыть данные кейса',exact:true}).click();await expect(page.getByText('Официальный набор · локальный доступ',{exact:true})).toBeVisible();
  await expect(page.locator('.company-button')).toContainText('U_9250');await nav(page,'Аналитика банка');await expect(page.locator('.document-card')).toHaveCount(9);await page.getByLabel('Поиск по банковским материалам').fill('ключевая ставка');await page.getByRole('button',{name:'Найти фрагменты'}).click();await expect(page.locator('.bank-results .panel').first()).toBeVisible();await expect(page.locator('.bank-results .source-link').first()).toHaveAttribute('href',/drive.google.com/);
 });

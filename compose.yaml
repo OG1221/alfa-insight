@@ -32,7 +32,7 @@ services:
       LLM_INPUT_RUB_PER_MILLION: ${LLM_INPUT_RUB_PER_MILLION:-0}
       LLM_OUTPUT_RUB_PER_MILLION: ${LLM_OUTPUT_RUB_PER_MILLION:-0}
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:${APP_PORT:-8000}:8000"
     volumes:
       - ./data/private:/app/data/private:ro
     depends_on:

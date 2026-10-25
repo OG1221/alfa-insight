@@ -39,7 +39,9 @@ SYSTEM='''Ты аналитик конкурсного прототипа. Вх�
 Отделяй условные выводы от фактов. Наличие продукта не даёт величину долга или ликвидности.
 Не придумывай числа, прогнозы, источники, позицию банка. Учитывай давность документов и дату события.
 Если источники противоречат друг другу, отрази неопределённость. Не устанавливай текущую ставку по старому обзору.
-Верни только JSON по схеме: summary: {text,evidence_ids}, risks/opportunities/actions: [{text,evidence_ids}], uncertainties: [string].
+Верни только JSON по схеме: summary: {text,evidence_ids,evidence_quotes}, risks/opportunities/actions/bank_view: [{text,evidence_ids,evidence_quotes}], uncertainties: [string].
+Для КАЖДОГО вывода evidence_quotes содержит хотя бы одну точную цитату длиной 8–700 символов: {evidence_id,quote}. Цитаты должны буквально присутствовать в evidence.text. bank_view содержит только подтверждённую позицию банка с цитатой банковского источника; при отсутствии подходящей позиции — пустой список.
+Если review=true, проверь candidate заново по evidence, исправь указанные validation_errors, убери неподдержанные выводы. Это проверка внешних источников, а не повторение прежнего ответа.
 Каждый вывод должен ссылаться только на id из evidence. Рекомендации — вопросы/направления проверки, без уверенных инвестиционных указаний.'''
 
 class OrganizerProvider:
@@ -63,8 +65,9 @@ class OrganizerProvider:
                     if response.status_code!=429 or attempt==1:break
                     await asyncio.sleep(1)
                 response.raise_for_status();data=response.json()
-                if data.get('model') and data['model']!=settings.llm_model:raise ValueError('API вернул другой идентификатор модели; проверьте конфигурацию')
+                if data.get('model')!=settings.llm_model:raise ValueError('API вернул другой идентификатор модели; проверьте конфигурацию')
                 tokens=data.get('usage',{});inp=int(tokens.get('prompt_tokens',max_input));out=int(tokens.get('completion_tokens',settings.llm_max_tokens))
+                if inp<0 or out<0:raise ValueError('Некорректный usage API')
                 usage.input_tokens=inp;usage.output_tokens=out;usage.cost_rub=(inp*settings.llm_input_rub_per_million+out*settings.llm_output_rub_per_million)/1_000_000;usage.status='charged';db.commit()
                 return GeneratedInsight.model_validate_json(data['choices'][0]['message']['content'])
         except Exception:

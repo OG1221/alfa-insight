@@ -18,6 +18,7 @@ from .ranking import rank
 from .search import search_bank
 from .agent import analyze,run_dict,validate_claims
 from .llm import readiness,get_provider
+from .grounding import model_context
 from .seed import seed
 
 log=logging.getLogger('alfa-insight')
@@ -126,8 +127,8 @@ async def question(id:str,body:QuestionInput,db:DB,p:P):
     run=get_run(db,id,p)
     if not readiness()[0]:raise HTTPException(503,'Уточняющие ответы требуют ключа разрешённой LLM. Источники и анализ по правилам доступны.')
     try:
-        generated=await get_provider().generate(db,{'question':body.question,'existing_analysis':run.result,'evidence':run.result['evidence']})
-        result,validation=validate_claims(generated,run.result['evidence'])
+        generated=await get_provider().generate(db,model_context(task='Ответить на уточняющий вопрос по собранным источникам',question=body.question,previous=run.result.get('interpretation'),evidence=run.result['evidence'],role=run.role))
+        result,validation=validate_claims(generated,run.result['evidence'],require_quotes=True)
         db.add(AgentStep(run_id=id,tool='followup_question',summary='Ответ на уточняющий вопрос',output={'question':body.question,'answer':result,'validation':validation}));db.commit()
         return result
     except Exception:raise HTTPException(502,'LLM не вернула проверяемый ответ') from None
