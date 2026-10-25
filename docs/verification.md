@@ -1,3 +1,5 @@
+> Историческая проверка исходной версии на macOS/Docker. Текущая доработка: [проверка Windows](verification-windows.md).
+
 # Фактическая проверка версии для сдачи
 
 25 октября 2026, Europe/Moscow. macOS ARM64: Python 3.12.14, PostgreSQL 14, Node 24, Google Chrome. Docker через Colima: Linux ARM64, Engine 29.5.2, PostgreSQL 16.8. Секреты и полные локальные отчёты исключены из Git.

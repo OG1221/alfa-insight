@@ -20,6 +20,8 @@ services:
       DEMO_MODE: ${DEMO_MODE:-true}
       DEMO_TOKEN: ${DEMO_TOKEN:-alfa-local-demo}
       ADMIN_TOKEN: ${ADMIN_TOKEN:-alfa-local-admin}
+      AGENT_MAX_STEPS: ${AGENT_MAX_STEPS:-24}
+      AGENT_TIMEOUT: ${AGENT_TIMEOUT:-90}
       LLM_MODE: ${LLM_MODE:-disabled}
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_BASE_URL: ${LLM_BASE_URL:-}

@@ -20,7 +20,7 @@ class Company(Base):
     countries: Mapped[str] = mapped_column(Text, default='')
     raw: Mapped[dict] = mapped_column(JSON, default=dict)
     synthetic: Mapped[bool] = mapped_column(Boolean, default=False)
-    __table_args__ = (Index('ix_company_region', 'region'),)
+    __table_args__ = (Index('ix_company_region', 'region'), Index('ix_company_synthetic','synthetic'))
 
 class PersonLink(Base):
     __tablename__ = 'person_links'

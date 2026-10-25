@@ -127,10 +127,19 @@ async def question(id:str,body:QuestionInput,db:DB,p:P):
     run=get_run(db,id,p)
     if not readiness()[0]:raise HTTPException(503,'Уточняющие ответы требуют ключа разрешённой LLM. Источники и анализ по правилам доступны.')
     try:
-        generated=await get_provider().generate(db,model_context(task='Ответить на уточняющий вопрос по собранным источникам',question=body.question,previous=run.result.get('interpretation'),evidence=run.result['evidence'],role=run.role))
-        result,validation=validate_claims(generated,run.result['evidence'],require_quotes=True)
-        db.add(AgentStep(run_id=id,tool='followup_question',summary='Ответ на уточняющий вопрос',output={'question':body.question,'answer':result,'validation':validation}));db.commit()
-        return result
+        from .investigation import build_evidence,related_events,merge_items
+        company=get_company(db,run.company_id,p);event=db.get(Article,run.article_id)
+        bank=search_bank(db,body.question,4,company.synthetic)
+        nearby=related_events(db,event,company.synthetic,body.question)
+        extra=build_evidence(profile(db,company),event,bank,nearby)
+        evidence=merge_items(extra,run.result['evidence'],16)
+        previous_steps=db.scalars(select(AgentStep).where(AgentStep.run_id==id,AgentStep.tool=='followup_question').order_by(AgentStep.id.desc()).limit(2)).all()
+        context=model_context(task='Ответить на уточняющий вопрос; при нехватке доказательств объяснить ограничения',question=body.question,previous=run.result.get('interpretation'),evidence=evidence,role=run.role)
+        context['conversation']=[{'question':s.output['question'][:250],'answer':s.output['answer']['summary']['text'][:250]} for s in reversed(previous_steps)]
+        generated=await asyncio.wait_for(get_provider().generate(db,context),timeout=settings.llm_timeout+2)
+        result,validation=validate_claims(generated,context['evidence'],require_quotes=True)
+        db.add(AgentStep(run_id=id,tool='followup_question',summary='Уточняющий поиск и ответ с учетом диалога',output={'question':body.question,'answer':result,'validation':validation,'evidence':context['evidence'],'queries':[body.question]}));db.commit()
+        return {**result,'evidence':context['evidence']}
     except Exception:raise HTTPException(502,'LLM не вернула проверяемый ответ') from None
 @app.post('/api/analyses/{id}/feedback')
 def feedback(id:str,body:FeedbackInput,db:DB,p:P):
@@ -153,17 +162,23 @@ async def upload_csv(db:DB,p:P,file:UploadFile=File(...)):
     suffix=Path(file.filename or '').suffix.lower()
     if suffix not in ('.csv','.pdf'):raise HTTPException(422,'Поддерживаются CSV и PDF')
     try:
-        with tempfile.NamedTemporaryFile(suffix=suffix) as f:
-            f.write(data);f.flush();result=import_pdf(db,f.name) if suffix=='.pdf' else import_csv(db,f.name)
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/('upload'+suffix)
+            path.write_bytes(data)
+            result=import_pdf(db,path) if suffix=='.pdf' else import_csv(db,path)
         return result
     except Exception as exc:db.rollback();raise HTTPException(422,str(exc)[:250]) from None
 @app.get('/api/metrics')
 def metrics(db:DB,p:P):
     stmt=select(AgentRun)
     if not p.admin:stmt=stmt.join(Company,AgentRun.company_id==Company.id).where(Company.synthetic.is_(True))
-    runs=db.scalars(stmt).all();done=[r for r in runs if r.status=='complete'];claims=sum(r.result.get('validation',{}).get('claims_count',0) for r in done)
+    if not p.admin:stmt=stmt.join(Article,AgentRun.article_id==Article.id).where(Article.private.is_(False))
+    runs=db.scalars(stmt).all();done=[r for r in runs if r.status=='complete']
+    from .investigation import reference_stats
+    coverage=[reference_stats(r.result['interpretation'],r.result.get('evidence',[])) for r in done if r.result.get('interpretation')]
+    total_claims=sum(x['claims_count'] for x in coverage);claims=sum(x['claims_with_checked_references'] for x in coverage)
     costs=db.scalar(select(func.coalesce(func.sum(LLMUsage.cost_rub),0))) if p.admin else None
-    return {'runs':len(runs),'completed':len(done),'failed':sum(r.status=='failed' for r in runs),'avg_duration_ms':round(sum(r.duration_ms for r in done)/len(done)) if done else None,'claims_with_checked_references':claims,'reference_coverage':1.0 if claims else None,'semantic_quality_measured':False,'llm_cost_or_reserved_rub':costs,'feedback_count':db.scalar(select(func.count()).select_from(Feedback).where(Feedback.run_id.in_([r.id for r in runs]))),'precision_at_k':None,'ndcg':None}
+    return {'runs':len(runs),'completed':len(done),'failed':sum(r.status=='failed' for r in runs),'avg_duration_ms':round(sum(r.duration_ms for r in done)/len(done)) if done else None,'claims_with_checked_references':claims,'reference_coverage':claims/total_claims if total_claims else None,'semantic_quality_measured':False,'llm_cost_or_reserved_rub':costs,'feedback_count':db.scalar(select(func.count()).select_from(Feedback).where(Feedback.run_id.in_([r.id for r in runs]))),'precision_at_k':None,'ndcg':None}
 
 static=ROOT/'frontend/dist'
 if static.exists():

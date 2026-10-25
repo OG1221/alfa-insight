@@ -37,3 +37,5 @@ class GeneratedInsight(BaseModel):
     actions: list[Claim] = Field(max_length=6)
     bank_view: list[Claim] = Field(default_factory=list,max_length=4)
     uncertainties: list[str] = Field(max_length=12)
+    retrieval_queries: list[str] = Field(default_factory=list,max_length=2)
+    evidence_gaps: list[str] = Field(default_factory=list,max_length=6)

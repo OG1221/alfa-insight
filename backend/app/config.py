@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     llm_daily_budget_rub: float = 500
     llm_input_rub_per_million: float = 0
     llm_output_rub_per_million: float = 0
-    agent_max_steps: int = 16
+    agent_max_steps: int = 24
     agent_timeout: int = 90
     news_hosts: str = 'www.cbr.ru,cbr.ru,www.interfax.ru,interfax.ru,tass.ru,www.rbc.ru'
 

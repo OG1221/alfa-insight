@@ -19,4 +19,4 @@ with SessionLocal() as db:
  assert outcomes[0]['risks']!=outcomes[1]['risks']
  assert all(r['bank_excerpt_count']>0 for r in outcomes)
  report={'historical_article_id':a.id,'comparison':outcomes,'rss':asyncio.run(refresh_news(db))}
- Path('runtime/official-verification.json').write_text(json.dumps(report,ensure_ascii=False,indent=2));print(json.dumps(report,ensure_ascii=False,indent=2))
+ Path('runtime/official-verification.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8');print(json.dumps(report,ensure_ascii=False,indent=2))

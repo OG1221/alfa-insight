@@ -17,6 +17,6 @@ with SessionLocal() as db:
     article,_=add_article(db,'Учебная проверка реального AI API','Учебный сценарий: ключевая ставка может влиять на новые кредитные договоры. Это синтетическая проверка API без банковского прогноза.',synthetic=True)
     run=asyncio.run(analyze(db,'DEMO_U_101',article.id))
     report={'mode':run.mode,'status':run.status,'error':run.result.get('generation_error'),'verified_quote_count':run.result.get('validation',{}).get('verified_quote_count',0),'run_id':run.id,'real_ai_verified':run.mode=='llm'}
-    (ROOT/'runtime/llm-acceptance.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))
+    (ROOT/'runtime/llm-acceptance.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
     print(json.dumps(report,ensure_ascii=False,indent=2))
     if run.mode!='llm':raise SystemExit(1)

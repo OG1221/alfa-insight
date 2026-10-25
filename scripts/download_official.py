@@ -28,5 +28,5 @@ def download(item):
 if __name__=='__main__':
  Path('data/private').mkdir(parents=True,exist_ok=True)
  with ThreadPoolExecutor(max_workers=3) as pool: results=list(pool.map(download,FILES.items()))
- Path('data/private/manifest.json').write_text(json.dumps(results,ensure_ascii=False,indent=2))
+ Path('data/private/manifest.json').write_text(json.dumps(results,ensure_ascii=False,indent=2),encoding='utf-8')
  for r in results: print(r['name'],r['status'],r.get('bytes',r.get('error')))

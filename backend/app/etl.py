@@ -18,12 +18,35 @@ def cleaned(value):
     s=str(value or '').strip()
     return '' if s.lower() in {'nan','none','null','na'} else s
 
+class CSVRows:
+    def __init__(self,path,encoding,delimiter):
+        self.stream=Path(path).open('r',encoding=encoding,newline='')
+        self.reader=csv.DictReader(self.stream,delimiter=delimiter)
+        self.fieldnames=self.reader.fieldnames
+    def close(self):self.stream.close()
+    def __iter__(self):
+        try:yield from self.reader
+        finally:self.close()
+    def __del__(self):self.close()
+
+
 def read_csv(path):
-    data=Path(path).read_bytes()
-    try: text=data.decode('utf-8-sig'); encoding='utf-8-sig'
-    except UnicodeDecodeError: text=data.decode('cp1251'); encoding='cp1251'
-    delimiter=csv.Sniffer().sniff(text[:8192],delimiters=';,\t').delimiter
-    return csv.DictReader(io.StringIO(text),delimiter=delimiter),encoding,delimiter,hashlib.sha256(data).hexdigest()
+    import codecs
+    digest=hashlib.sha256();decoder=codecs.getincrementaldecoder('utf-8-sig')();utf8=True
+    with Path(path).open('rb') as source:
+        while chunk:=source.read(1024*1024):
+            digest.update(chunk)
+            if utf8:
+                try:decoder.decode(chunk)
+                except UnicodeDecodeError:utf8=False
+        if utf8:
+            try:decoder.decode(b'',final=True)
+            except UnicodeDecodeError:utf8=False
+    encoding='utf-8-sig' if utf8 else 'cp1251'
+    with Path(path).open('r',encoding=encoding,newline='') as source:sample=source.read(8192)
+    delimiter=csv.Sniffer().sniff(sample,delimiters=';,\t').delimiter
+    return CSVRows(path,encoding,delimiter),encoding,delimiter,digest.hexdigest()
+
 
 def upsert(db,model,rows):
     if not rows:return
@@ -41,7 +64,7 @@ def import_csv(db,path,synthetic=False):
     if not required <= fields:raise ValueError(f'Нет обязательных колонок: {required-fields}')
     report={'pipeline_version':3,'conflicting_rows':0,'kind':kind,'rows':0,'accepted':0,'rejected':0,'duplicates':0,'missing_values':0,'unknown_company_links':0,'invalid_flags':0,'encoding':encoding,'delimiter':delimiter,'synthetic':synthetic,'sha256':digest}
     known=set(db.scalars(select(Company.id))) if kind!='companies' else set()
-    seen={};batch=[]
+    seen={};batch=[];issues=[];issue_ids=set()
     for row in reader:
         report['rows']+=1
         r={k:cleaned(v) for k,v in row.items() if k};report['missing_values']+=sum(v=='' for v in r.values())
@@ -71,14 +94,17 @@ def import_csv(db,path,synthetic=False):
             if seen[ident]==row_digest:report['duplicates']+=1;continue
             report['conflicting_rows']+=1
             issue_id=hash_id(digest+ident+row_digest)
-            if not db.get(DataIssue,issue_id):
-                db.add(DataIssue(id=issue_id,batch_sha=digest,kind=kind,record_key=r.get('SYNTHETIC_U') or (r.get('PAYER','')+'|'+r.get('BENEFICIARY','')),detail={'incoming_variant':r,'first_row_sha':seen[ident],'policy':'company: first occurrence retained with conflict flag; payment: distinct conflicting row retained separately'}))
+            if issue_id not in issue_ids:
+                issue_ids.add(issue_id)
+                issues.append({'id':issue_id,'batch_sha':digest,'kind':kind,'record_key':r.get('SYNTHETIC_U') or (r.get('PAYER','')+'|'+r.get('BENEFICIARY','')),'detail':{'incoming_variant':r,'first_row_sha':seen[ident],'policy':'company: first occurrence retained with conflict flag; payment: distinct conflicting row retained separately'}})
+                if len(issues)>=700:upsert(db,DataIssue,issues);issues=[]
             if kind!='payments':continue
             ident=hash_id(ident+'|'+row_digest);value['id']=ident
             if ident in seen:report['duplicates']+=1;continue
         seen[ident]=row_digest;batch.append(value);report['accepted']+=1
         if len(batch)>=700:upsert(db,model,batch);batch=[]
     upsert(db,model,batch)
+    upsert(db,DataIssue,issues)
     if old:old.report=report
     else:db.add(ImportBatch(sha256=digest,name=Path(path).name,report=report))
     db.commit()

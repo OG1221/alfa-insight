@@ -25,6 +25,8 @@ def relations(db,c,limit=12):
 
 def profile(db,c):
     result=company_dict(c);result['raw']=c.raw;result['relationships']=relations(db,c)
+    feature_keys=('ORG_TYPE','OKFS_NAME','COMPANY_AGE_YEARS_GRADATION','ECO_MARK_LABEL','AMOUNT_WORKERS_FNS_GRADATION','AMOUNT_WORKERS_SPARK_GRADATION','CL_TYPE')
+    result['business_features']={k:c.raw[k] for k in feature_keys if c.raw.get(k)}
     result['data_quality_conflicts']=[x.detail for x in db.scalars(select(DataIssue).where(DataIssue.kind=='companies',DataIssue.record_key==c.id))]
     result['limitations']=['Обезличенные данные: название компании неизвестно.','Наличие продукта не определяет задолженность или остаток средств.','Рыночная доля, структура издержек и валютная позиция неизвестны.','Единица выручки и период платежей в спецификации не уточнены; денежные оценки влияния не рассчитываются.']
     if result['data_quality_conflicts']:result['limitations'].append('В CSV есть противоречащие строки этого ID. Использована первая строка; альтернативы сохранены для проверки. Анализ неоднозначен.')

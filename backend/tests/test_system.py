@@ -164,8 +164,8 @@ def test_migrations_on_empty_postgres_schema():
         result=subprocess.run([sys.executable,'-m','alembic','-c',str(ROOT/'backend/alembic.ini'),'upgrade','head'],env=env,capture_output=True,text=True,timeout=30)
         assert result.returncode==0,result.stderr
         with engine.connect() as c:
-            assert c.execute(text(f'SELECT version_num FROM {schema}.alembic_version')).scalar()=='0004'
-            assert c.execute(text("SELECT count(*) FROM pg_indexes WHERE schemaname=:s AND indexname='ix_chunk_fts_ru'"),{'s':schema}).scalar()==1
+            assert c.execute(text(f'SELECT version_num FROM {schema}.alembic_version')).scalar()=='0005'
+            assert c.execute(text("SELECT count(*) FROM pg_indexes WHERE schemaname=:s AND indexname IN ('ix_chunk_fts_ru','ix_company_synthetic')"),{'s':schema}).scalar()==2
     finally:
         with engine.begin() as c:c.execute(text(f'DROP SCHEMA {schema} CASCADE'))
 

@@ -22,7 +22,7 @@ Core components (upstream licenses remain authoritative):
 - TypeScript — Apache-2.0; https://www.typescriptlang.org/
 - Playwright — Apache-2.0; https://playwright.dev/
 - Golos Text — SIL Open Font License 1.1; https://fonts.google.com/specimen/Golos+Text
-- Tesseract (Docker/Linux OCR) — Apache-2.0; https://github.com/tesseract-ocr/tesseract
+- Tesseract (Docker/Linux/Windows OCR) — Apache-2.0; https://github.com/tesseract-ocr/tesseract
 - macOS Vision / Swift frameworks — Apple platform terms; local OCR only, no cloud API
 - Node / Python / PostgreSQL container images — respective upstream and bundled OS component licenses
 
@@ -40,3 +40,5 @@ LLM integrations:
 - Only the six case-approved model names are permitted. Licensing and API usage terms must be confirmed with organizers before enabling an actual model.
 - TestProvider is a deterministic test stub, not generative AI and not bank expertise. HTTP contract tests use a local stub and fictional organizer.invalid endpoint, never a real provider.
 - The developer's coding assistant is a development tool, not the running application's AI engine.
+
+Windows verification tools (not bundled in source release): PostgreSQL 17.11 EDB binary archive, Tesseract 5.5.3 Windows build from the upstream release and tessdata_fast rus/eng from https://github.com/tesseract-ocr/tessdata_fast . Preserve upstream notices when redistributing binaries. Python tzdata supplies IANA time zone data; see https://github.com/python/tzdata for upstream notices.

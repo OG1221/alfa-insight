@@ -1,4 +1,4 @@
-import time,uuid,re
+import asyncio,time,uuid,re
 from sqlalchemy import select
 from .db import Company,Article,AgentRun,AgentStep
 from .profiles import profile,relations
@@ -7,8 +7,10 @@ from .search import search_bank
 from .news import article_dict
 from .llm import get_provider,readiness
 from .config import settings
+from .investigation import related_events,assess_evidence,build_evidence,merge_items,reference_stats
 
 TOOL_LABELS={'get_company_profile':'Загружен профиль компании','get_bank_products':'Проверены банковские продукты','get_news_event':'Получено новостное событие','analyze_relationships':'Проверены платежные и групповые связи','search_related_news':'Найдены связанные события','search_bank_analytics':'Выполнен поиск по документам банка','broaden_search':'Поиск расширен из-за нехватки данных','calculate_relevance':'Рассчитана релевантность','get_evidence':'Собраны исходные доказательства','generation_failure':'Зафиксирована ошибка генерации или проверки LLM','review_interpretation':'Проведена повторная проверка ответа по источникам','generate_interpretation':'Запрошена разрешённая LLM','check_claims':'Проверены ссылки и полнота результата','save_result':'Результат сохранён'}
+TOOL_LABELS.update(assess_evidence='Оценены полнота, противоречия и применимость источников', targeted_search='Повторный поиск по выявленным пробелам', reassess_evidence='Проверены доказательства после повторного поиска')
 
 def rule_interpretation(company,article,relevance):
     text=(article.title+' '+article.text).lower();risks=[];opportunities=[];actions=[]
@@ -49,19 +51,21 @@ async def analyze(db,company_id,article_id,role='cfo',provider=None):
         event=tool('get_news_event',lambda:article_dict(article))
         plan=['get_company_profile','get_news_event','get_bank_products']
         if p['relationships']['items']:plan+=['analyze_relationships']
-        plan+=['search_related_news','search_bank_analytics','calculate_relevance','get_evidence']
+        plan+=['search_related_news','search_bank_analytics','assess_evidence','calculate_relevance','get_evidence']
         if readiness()[0] or provider:plan+=['generate_interpretation','review_interpretation']
         plan+=['check_claims','save_result'];run.plan=plan;db.commit()
         tool('get_bank_products',lambda:company.products)
         related=tool('analyze_relationships',lambda:p['relationships']) if p['relationships']['items'] else {'items':[]}
-        nearby=tool('search_related_news',lambda:[{'id':a.id,'title':a.title} for a in db.scalars(select(Article).where(Article.category==article.category,Article.id!=article.id,Article.private.is_(False) if company.synthetic else True).limit(4))])
+        nearby=tool('search_related_news',lambda:related_events(db,article,company.synthetic))
         bank=tool('search_bank_analytics',lambda:search_bank(db,article.title,4,company.synthetic,article.url))
-        if not bank:
-            expanded=list(run.plan);expanded.insert(expanded.index('search_bank_analytics')+1,'broaden_search');run.plan=expanded;db.commit()
-            bank=tool('broaden_search',lambda:search_bank(db,article.category+' '+company.sector,4,company.synthetic))
+        assessment=tool('assess_evidence',lambda:assess_evidence(p,article,bank))
+        if assessment['needs_search']:
+            expanded=list(run.plan);expanded.insert(expanded.index('assess_evidence')+1,'broaden_search');run.plan=expanded;db.commit()
+            bank=merge_items(bank,tool('broaden_search',lambda:search_bank(db,article.category+' '+company.sector+' '+company.countries,4,company.synthetic)))
+            expanded=list(run.plan);expanded.insert(expanded.index('calculate_relevance'),'reassess_evidence');run.plan=expanded;db.commit()
+            assessment=tool('reassess_evidence',lambda:assess_evidence(p,article,bank))
         relevance=tool('calculate_relevance',lambda:rank(company,article,role,related,bool(bank)))
-        evidence=[{'id':'profile','type':'company','title':'Профиль '+company.id,'text':str({k:p[k] for k in ['id','sector','region','products','foreign_trade','countries','revenue']}),'synthetic':company.synthetic}, {'id':'news','type':'news','title':article.title,'text':article.text,'url':article.url,'synthetic':article.synthetic}]
-        evidence += [{'id':'bank:'+b['id'],'type':'bank','title':b['title'],'text':b['text'],'page':b['page'],'url':b['source_url'],'extraction':b.get('extraction','pdf-text'),'synthetic':b['synthetic']} for b in bank]
+        evidence=build_evidence(p,article,bank,nearby)
         tool('get_evidence',lambda:{'items':evidence})
         interpretation=rule_interpretation(company,article,relevance);mode='rules';generation_error=None
         validation={'references_valid':True,'numeric_grounding':True,'semantic_support':'Условные формулировки правил; банковские фрагменты приведены отдельно.'}
@@ -70,31 +74,56 @@ async def analyze(db,company_id,article_id,role='cfo',provider=None):
                 t=time.monotonic()
                 # Draft and bounded review follow the actual retrieval tools.
                 selected_provider=provider or get_provider()
-                generated=await selected_provider.generate(db,model_context(task=run.task,company=p,event=event,evidence=evidence,role=role))
+                context=model_context(task=run.task,company=p,event=event,evidence=evidence,role=role)
+                context['assessment']=assessment
+                generated=await asyncio.wait_for(selected_provider.generate(db,context),timeout=max(.1,settings.agent_timeout-(time.monotonic()-started)))
                 tool('generate_interpretation',lambda:{'provider':'test' if provider else settings.llm_model,'request_duration_ms':int((time.monotonic()-t)*1000)})
                 draft_error=None
                 try:
-                    validate_claims(generated,evidence,require_quotes=not bool(provider))
+                    validate_claims(generated,context['evidence'],require_quotes=not bool(provider))
                 except (ValueError,TypeError) as exc:
                     draft_error=str(exc)[:1000]
+                queries=getattr(generated,'retrieval_queries',[])[:2]
+                gaps=getattr(generated,'evidence_gaps',[])[:6]
+                if draft_error or queries or gaps:
+                    if not queries:queries=[article.category+' '+company.sector]
+                    # Model output can request text searches only. Source scope and limits
+                    # are enforced here; it cannot choose a URL, SQL or arbitrary tool.
+                    def retrieve():
+                        nonlocal bank,nearby
+                        used=[]
+                        for query in queries:
+                            query=' '.join(str(query).split())[:240]
+                            if not query:continue
+                            bank=merge_items(search_bank(db,query,4,company.synthetic),bank)
+                            nearby=merge_items(related_events(db,article,company.synthetic,query),nearby,3)
+                            used.append(query)
+                        return {'queries':used,'gaps':gaps,'validation_errors':draft_error,'bank_ids':[b['id'] for b in bank]}
+                    expanded=list(run.plan);idx=expanded.index('review_interpretation');expanded[idx:idx]=['targeted_search','reassess_evidence'];run.plan=expanded;db.commit()
+                    tool('targeted_search',retrieve)
+                    evidence=build_evidence(p,article,bank,nearby)
+                    assessment=tool('reassess_evidence',lambda:assess_evidence(p,article,bank))
                 # Review independently against evidence, or correct a rejected draft. Budget
                 # reservation applies to both actual calls; no unbounded repair loop.
                 t=time.monotonic()
-                reviewed=await selected_provider.generate(db,model_context(task=run.task,company=p,event=event,evidence=evidence,role=role,candidate=generated,review=True,errors=draft_error))
-                interpretation,validation=validate_claims(reviewed,evidence,require_quotes=not bool(provider));mode='test' if provider else 'llm'
+                context=model_context(task=run.task,company=p,event=event,evidence=evidence,role=role,candidate=generated,review=True,errors=draft_error)
+                context['assessment']=assessment
+                reviewed=await asyncio.wait_for(selected_provider.generate(db,context),timeout=max(.1,settings.agent_timeout-(time.monotonic()-started)))
+                interpretation,validation=validate_claims(reviewed,context['evidence'],require_quotes=not bool(provider));mode='test' if provider else 'llm'
+                interpretation['uncertainties']+=getattr(reviewed,'evidence_gaps',[])[:6]
                 tool('review_interpretation',lambda:{'validated':True,'draft_required_correction':bool(draft_error),'request_duration_ms':int((time.monotonic()-t)*1000)})
             except Exception as exc:
                 generation_error=str(exc)[:250];tool('generation_failure',lambda:{'validated':False,'error':generation_error})
-        uncertainties=interpretation['uncertainties']+p['limitations']
+        uncertainties=interpretation['uncertainties']+p['limitations']+assessment['gaps']
         if not bank:uncertainties.append('Релевантная позиция банка не найдена.')
         else:uncertainties.append('Банковские материалы — архив кейса. Совпадение поиска не подтверждает причинность и актуальность; цитаты нужно проверить на странице оригинала. OCR может содержать ошибки.')
         if generation_error:uncertainties.append('Генерация недоступна: '+generation_error)
-        validation['missing_bank']=not bool(bank);validation['evidence_count']=len(evidence);validation['claims_count']=1+sum(len(interpretation[k]) for k in ['risks','opportunities','actions','bank_view'])
+        validation['missing_bank']=not bool(bank);validation['evidence_count']=len(evidence);validation.update(reference_stats(interpretation,evidence))
         tool('check_claims',lambda:validation)
-        result={'company':{k:p[k] for k in ['id','label','sector','products','synthetic']},'event':event,'relevance':relevance,'interpretation':interpretation,'bank_excerpts':bank,'evidence':evidence,'uncertainties':uncertainties,'validation':validation,'mode':mode,'ai_available':readiness()[0],'generation_error':generation_error}
+        result={'company':{k:p[k] for k in ['id','label','sector','products','synthetic']},'event':event,'relevance':relevance,'interpretation':interpretation,'bank_excerpts':bank,'evidence':evidence,'assessment':assessment,'uncertainties':list(dict.fromkeys(uncertainties)),'validation':validation,'mode':mode,'ai_available':readiness()[0],'generation_error':generation_error}
         run.result=result;run.mode=mode;run.status='complete';run.duration_ms=int((time.monotonic()-started)*1000);db.commit()
         tool('save_result',lambda:{'run_id':run.id,'status':'complete'});return run
-    except Exception as exc:
+    except (Exception,asyncio.CancelledError) as exc:
         db.rollback();run=db.get(AgentRun,run.id);run.status='failed';run.error=str(exc)[:300];run.duration_ms=int((time.monotonic()-started)*1000);db.commit();raise
 
 def run_dict(db,run):

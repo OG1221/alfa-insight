@@ -1,33 +1,36 @@
 {
   "checked_at": "2026-10-25",
-  "deadline": "2026-10-26",
-  "deadline_time_known": false,
+  "environment": "Windows x64, PostgreSQL 17.11 portable, project and data on D:",
   "backend_tests": {
-    "tests": 47,
+    "tests": 54,
     "failures": 0,
     "errors": 0
   },
   "e2e": {
-    "local": {
-      "passed": 8,
-      "skipped": 0
-    },
-    "docker": {
-      "passed": 6,
-      "skipped": 2
-    }
+    "passed": 8,
+    "skipped": 0,
+    "unexpected": 0
   },
-  "frontend_build": "passed",
-  "migrations_fresh_schema": "passed",
-  "local_start_script": "passed",
-  "final_http_smoke": "passed",
-  "real_llm": "blocked: organizer API configuration absent",
-  "docker_runtime": "ARM64 build/up, health, HTTP, 6 E2E and Tesseract OCR passed",
+  "frontend_build": "passed TypeScript and Vite",
+  "migrations_fresh_schema": "passed through 0005",
+  "official_comparison": "passed U_9250 vs U_57706",
+  "official_data": {
+    "companies": 85514,
+    "person_links": 12514,
+    "payments": 1380584,
+    "bank_documents": 9,
+    "pages": 64,
+    "chunks": 179
+  },
+  "rss": "both sources fetched successfully",
+  "real_llm": "not verified: organizer credentials not provided",
+  "docker_current_version": "Compose configuration valid; image build/runtime not reverified on this Windows machine",
+  "github_current_version": "review branch prepared; CI status recorded separately",
+  "jury_access": "not verified; previous report says invitation not sent",
   "public_url": null,
-  "github_remote": "https://github.com/mariapiskun/alfa-insight-hackathon-2026",
-  "release_tag": "v0.2.0-submission",
-  "github_visibility": "PRIVATE",
-  "github_jury_access": "not sent: user declined permission request",
-  "github_actions": "passed: 40218674452",
-  "public_status": "DNS corrected in container; QUIC and HTTP/2 edge unreachable; persistent hosting not connected"
+  "submission_form": "not sent",
+  "previous_release": {
+    "tag": "v0.2.0-submission",
+    "github_actions": "passed: 40218674452"
+  }
 }

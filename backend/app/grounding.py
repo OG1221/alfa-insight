@@ -43,11 +43,11 @@ def validate_claims(generated,evidence,require_quotes=False):
 def model_context(*,company=None,event=None,evidence,role='cfo',task='',question=None,previous=None,candidate=None,review=False,errors=None):
     """Bound context without duplicating full profile/event/run payloads or exposing secrets."""
     ev=[]
-    for item in evidence[:8]:
+    for item in evidence[:16]:
         cap=5200 if item.get('type')=='news' else 1800
-        ev.append({k:v for k,v in item.items() if k in ('id','type','title','page','url','synthetic','extraction') } | {'text':item.get('text','')[:cap]})
+        ev.append({k:v for k,v in item.items() if k in ('id','type','title','page','url','synthetic','extraction','published_at','document_date','date_status') } | {'text':item.get('text','')[:cap]})
     result={'task':task[:600],'role':role,'evidence':ev,'review':review}
-    if company:result['company']={k:company.get(k) for k in ('id','sector','region','products','foreign_trade','countries','limitations')}
+    if company:result['company']={k:company.get(k) for k in ('id','sector','region','products','foreign_trade','countries','revenue','revenue_unit','group_id','business_features','limitations')}
     if event:result['event']={k:event.get(k) for k in ('id','title','category','published_at','source','synthetic')}
     if question:result['question']=question[:2000]
     if previous:result['previous_summary']=previous.get('summary',{})
@@ -55,7 +55,7 @@ def model_context(*,company=None,event=None,evidence,role='cfo',task='',question
     if errors:result['validation_errors']=errors[:1000]
     import json
     # A reviewed structured response may be long; reduce source text, never truncate JSON.
-    while len(json.dumps(result,ensure_ascii=False,default=str).encode())>39000:
+    while len(json.dumps(result,ensure_ascii=False,default=str).encode())>35000:
         longest=max(ev,key=lambda e:len(e['text']),default=None)
         if not longest or len(longest['text'])<350:raise ValueError('Не удалось уложить контекст в лимит')
         longest['text']=longest['text'][:max(300,len(longest['text'])//2)]
