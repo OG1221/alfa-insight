@@ -1,15 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-RUNTIME="$HOME/.cache/codex-runtimes/codex-primary-runtime/dependencies"
-if ! command -v node >/dev/null && [ -x "$RUNTIME/node/bin/node" ]; then export PATH="$RUNTIME/node/bin:$PATH"; fi
 if ! command -v pg_config >/dev/null && [ -d /opt/homebrew/opt/postgresql@14/bin ]; then export PATH="/opt/homebrew/opt/postgresql@14/bin:$PATH"; fi
 if ! command -v pg_config >/dev/null; then echo 'Нужен PostgreSQL (pg_config, initdb, pg_ctl) или Docker Compose.'; exit 1; fi
 PG_BIN="$(pg_config --bindir)"
 mkdir -p runtime
 if [ ! -x .venv/bin/python ]; then
   PYTHON_BIN="$(command -v python3.12 || true)"
-  if [ -z "$PYTHON_BIN" ] && [ -x "$RUNTIME/python/bin/python3" ]; then PYTHON_BIN="$RUNTIME/python/bin/python3"; fi
   if [ -z "$PYTHON_BIN" ]; then echo 'Нужен Python 3.12'; exit 1; fi
   "$PYTHON_BIN" -m venv .venv
   .venv/bin/python -m pip install -r backend/requirements.lock.txt
