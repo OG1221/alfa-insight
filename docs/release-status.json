@@ -24,9 +24,9 @@
   },
   "rss": "both sources fetched successfully",
   "real_llm": "not verified: organizer credentials not provided",
-  "docker_current_version": "Compose configuration valid; image build/runtime not reverified on this Windows machine",
+  "docker_current_version": "clean Linux Docker build and HTTP smoke passed in GitHub Actions 40230446809",
   "github_current_version": "standalone repository created; current revision and checks available in GitHub",
-  "jury_access": "not verified; previous report says invitation not sent",
+  "jury_access": "not granted in the new private repository",
   "public_url": null,
   "submission_form": "not sent",
   "previous_release": {
