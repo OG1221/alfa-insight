@@ -25,12 +25,13 @@
   "rss": "both sources fetched successfully",
   "real_llm": "not verified: organizer credentials not provided",
   "docker_current_version": "Compose configuration valid; image build/runtime not reverified on this Windows machine",
-  "github_current_version": "review branch prepared; CI status recorded separately",
+  "github_current_version": "standalone repository created; current revision and checks available in GitHub",
   "jury_access": "not verified; previous report says invitation not sent",
   "public_url": null,
   "submission_form": "not sent",
   "previous_release": {
     "tag": "v0.2.0-submission",
     "github_actions": "passed: 40218674452"
-  }
+  },
+  "github_remote": "https://github.com/OG1221/alfa-insight"
 }

@@ -48,3 +48,31 @@ jobs:
             pytest.xml
             runtime/playwright-results.json
             frontend/test-results
+
+  container:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      APP_PORT: "18081"
+      ADMIN_TOKEN: ci-container-admin-only
+      POSTGRES_PASSWORD: ci-container-only
+      LLM_MODE: disabled
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and start clean Docker stack
+        run: docker compose -p alfa-ci up --build --wait --wait-timeout 180
+      - name: Verify HTTP workflow and access boundaries
+        run: python scripts/container_smoke.py --url http://127.0.0.1:18081
+      - name: Capture container logs
+        if: always()
+        run: |
+          mkdir -p runtime
+          docker compose -p alfa-ci logs --no-color > runtime/docker-ci.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: container-verification
+          path: runtime/docker-ci.log
+      - name: Stop isolated test stack
+        if: always()
+        run: docker compose -p alfa-ci down -v
