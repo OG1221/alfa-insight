@@ -1,27 +1,33 @@
 {
-  "checked_at": "2026-10-22",
+  "checked_at": "2026-10-25",
   "deadline": "2026-10-26",
   "deadline_time_known": false,
   "backend_tests": {
-    "tests": 42,
+    "tests": 47,
     "failures": 0,
     "errors": 0
   },
   "e2e": {
-    "startTime": "2026-10-22T17:39:52.648Z",
-    "duration": 92996.317,
-    "expected": 8,
-    "skipped": 0,
-    "unexpected": 0,
-    "flaky": 0
+    "local": {
+      "passed": 8,
+      "skipped": 0
+    },
+    "docker": {
+      "passed": 6,
+      "skipped": 2
+    }
   },
   "frontend_build": "passed",
   "migrations_fresh_schema": "passed",
   "local_start_script": "passed",
   "final_http_smoke": "passed",
   "real_llm": "blocked: organizer API configuration absent",
-  "docker_runtime": "not tested: Docker absent",
+  "docker_runtime": "ARM64 build/up, health, HTTP, 6 E2E and Tesseract OCR passed",
   "public_url": null,
-  "github_remote": null,
-  "release_tag": "v0.1.0-demo"
+  "github_remote": "https://github.com/mariapiskun/alfa-insight-hackathon-2026",
+  "release_tag": "v0.2.0-submission",
+  "github_visibility": "PRIVATE",
+  "github_jury_access": "not sent: user declined permission request",
+  "github_actions": "passed: 40218674452",
+  "public_status": "DNS corrected in container; QUIC and HTTP/2 edge unreachable; persistent hosting not connected"
 }
